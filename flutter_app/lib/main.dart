@@ -1,121 +1,504 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
-  runApp(const MyApp());
+  runApp(const CropYieldApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class ApiConfig {
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://10.0.2.2:8000',
+  );
 
-  // This widget is the root of your application.
+  static Uri predictUri() {
+    final normalizedBaseUrl = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    return Uri.parse('$normalizedBaseUrl/predict');
+  }
+}
+
+class CropYieldApp extends StatelessWidget {
+  const CropYieldApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      debugShowCheckedModeBanner: false,
+      title: 'Crop Yield Predictor',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF0F766E),
+        ),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const CropYieldHomePage(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class CropYieldHomePage extends StatefulWidget {
+  const CropYieldHomePage({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<CropYieldHomePage> createState() => _CropYieldHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _CropYieldHomePageState extends State<CropYieldHomePage> {
+  static const Map<String, List<String>> _categoryOptions = {
+    'Region': ['East', 'North', 'South', 'West'],
+    'Soil_Type': ['Chalky', 'Clay', 'Loam', 'Peaty', 'Sandy', 'Silt'],
+    'Crop': ['Barley', 'Cotton', 'Maize', 'Rice', 'Soybean', 'Wheat'],
+    'Weather_Condition': ['Cloudy', 'Rainy', 'Sunny'],
+  };
 
-  void _incrementCounter() {
+  static const Map<String, Map<String, num>> _numericBounds = {
+    'Rainfall_mm': {'min': 100.00089622522204, 'max': 999.998098221668},
+    'Temperature_Celsius': {'min': 15.000034141430271, 'max': 39.99999662316004},
+    'Days_to_Harvest': {'min': 60, 'max': 149},
+  };
+
+  final Map<String, TextEditingController> _controllers = {
+    'Region': TextEditingController(text: 'North'),
+    'Soil_Type': TextEditingController(text: 'Loam'),
+    'Crop': TextEditingController(text: 'Maize'),
+    'Rainfall_mm': TextEditingController(text: '750'),
+    'Temperature_Celsius': TextEditingController(text: '27'),
+    'Fertilizer_Used': TextEditingController(text: 'true'),
+    'Irrigation_Used': TextEditingController(text: 'true'),
+    'Weather_Condition': TextEditingController(text: 'Sunny'),
+    'Days_to_Harvest': TextEditingController(text: '110'),
+  };
+
+  String _statusText = 'Fill the fields, then tap Predict to call the API.';
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    for (final controller in _controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  String? _normalizeCategory(String key, String rawValue) {
+    final normalized = rawValue.trim().toLowerCase();
+    for (final option in _categoryOptions[key]!) {
+      if (option.toLowerCase() == normalized) {
+        return option;
+      }
+    }
+    return null;
+  }
+
+  bool? _parseBool(String rawValue) {
+    switch (rawValue.trim().toLowerCase()) {
+      case 'true':
+      case '1':
+      case 'yes':
+      case 'y':
+        return true;
+      case 'false':
+      case '0':
+      case 'no':
+      case 'n':
+        return false;
+      default:
+        return null;
+    }
+  }
+
+  String? _validatePayload() {
+    for (final entry in _controllers.entries) {
+      if (entry.value.text.trim().isEmpty) {
+        return 'Missing value for ${entry.key.replaceAll('_', ' ')}.';
+      }
+    }
+
+    for (final category in _categoryOptions.keys) {
+      if (_normalizeCategory(category, _controllers[category]!.text) == null) {
+        return 'Invalid ${category.replaceAll('_', ' ')}. Use one of: ${_categoryOptions[category]!.join(', ')}.';
+      }
+    }
+
+    final rainfall = double.tryParse(_controllers['Rainfall_mm']!.text.trim());
+    final rainfallMin = _numericBounds['Rainfall_mm']!['min']!.toDouble();
+    final rainfallMax = _numericBounds['Rainfall_mm']!['max']!.toDouble();
+    if (rainfall == null || rainfall < rainfallMin || rainfall > rainfallMax) {
+      return 'Rainfall must be between ${rainfallMin.toStringAsFixed(0)} and ${rainfallMax.toStringAsFixed(0)} mm.';
+    }
+
+    final temperature = double.tryParse(_controllers['Temperature_Celsius']!.text.trim());
+    final temperatureMin = _numericBounds['Temperature_Celsius']!['min']!.toDouble();
+    final temperatureMax = _numericBounds['Temperature_Celsius']!['max']!.toDouble();
+    if (temperature == null || temperature < temperatureMin || temperature > temperatureMax) {
+      return 'Temperature must be between ${temperatureMin.toStringAsFixed(0)} and ${temperatureMax.toStringAsFixed(0)} °C.';
+    }
+
+    final days = int.tryParse(_controllers['Days_to_Harvest']!.text.trim());
+    final daysMin = _numericBounds['Days_to_Harvest']!['min']!.toInt();
+    final daysMax = _numericBounds['Days_to_Harvest']!['max']!.toInt();
+    if (days == null || days < daysMin || days > daysMax) {
+      return 'Days to harvest must be between $daysMin and $daysMax.';
+    }
+
+    if (_parseBool(_controllers['Fertilizer_Used']!.text) == null) {
+      return 'Fertilizer Used must be true or false.';
+    }
+
+    if (_parseBool(_controllers['Irrigation_Used']!.text) == null) {
+      return 'Irrigation Used must be true or false.';
+    }
+
+    return null;
+  }
+
+  Map<String, dynamic> _buildPayload() {
+    return <String, dynamic>{
+      'Region': _normalizeCategory('Region', _controllers['Region']!.text)!,
+      'Soil_Type': _normalizeCategory('Soil_Type', _controllers['Soil_Type']!.text)!,
+      'Crop': _normalizeCategory('Crop', _controllers['Crop']!.text)!,
+      'Rainfall_mm': double.parse(_controllers['Rainfall_mm']!.text.trim()),
+      'Temperature_Celsius': double.parse(_controllers['Temperature_Celsius']!.text.trim()),
+      'Fertilizer_Used': _parseBool(_controllers['Fertilizer_Used']!.text)!,
+      'Irrigation_Used': _parseBool(_controllers['Irrigation_Used']!.text)!,
+      'Weather_Condition': _normalizeCategory('Weather_Condition', _controllers['Weather_Condition']!.text)!,
+      'Days_to_Harvest': int.parse(_controllers['Days_to_Harvest']!.text.trim()),
+    };
+  }
+
+  String _buildErrorMessage(Object error) {
+    if (error is http.ClientException) {
+      return error.message;
+    }
+    return error.toString();
+  }
+
+  String _extractApiError(String responseBody) {
+    try {
+      final decoded = jsonDecode(responseBody);
+      if (decoded is Map<String, dynamic>) {
+        final detail = decoded['detail'];
+        if (detail is String) {
+          return detail;
+        }
+        if (detail is List) {
+          return detail.map((item) => item.toString()).join('\n');
+        }
+        return decoded.toString();
+      }
+    } catch (_) {
+      return responseBody;
+    }
+    return responseBody;
+  }
+
+  Future<void> _predictYield() async {
+    final validationError = _validatePayload();
+    if (validationError != null) {
+      setState(() {
+        _statusText = validationError;
+      });
+      return;
+    }
+
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _isLoading = true;
+      _statusText = 'Sending request to the API...';
     });
+
+    try {
+      final response = await http.post(
+        ApiConfig.predictUri(),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode(_buildPayload()),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final decodedBody = jsonDecode(response.body) as Map<String, dynamic>;
+        final predictedValue = (decodedBody['predicted_yield_tons_per_hectare'] as num).toDouble();
+        setState(() {
+          _statusText = 'Predicted yield: ${predictedValue.toStringAsFixed(2)} tons/hectare\nModel: ${decodedBody['model_name'] ?? 'unknown'}';
+        });
+      } else {
+        setState(() {
+          _statusText = _extractApiError(response.body).trim();
+        });
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _statusText = 'Request failed: ${_buildErrorMessage(error)}';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildField({
+    required String label,
+    required String hint,
+    required TextInputType keyboardType,
+    required String helperText,
+  }) {
+    return TextField(
+      controller: _controllers[label],
+      keyboardType: keyboardType,
+      style: const TextStyle(fontSize: 16),
+      decoration: InputDecoration(
+        labelText: label.replaceAll('_', ' '),
+        hintText: hint,
+        helperText: helperText,
+        filled: true,
+        fillColor: const Color(0xFFF8FAFC),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFE6FFFB), Color(0xFFF8FAFC), Color(0xFFF1F5F9)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF134E4A), Color(0xFF0F766E)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x1F134E4A),
+                        blurRadius: 24,
+                        offset: Offset(0, 12),
+                      ),
+                    ],
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Crop Yield Predictor',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Send crop, soil, weather, and farm inputs to the FastAPI model and receive a yield estimate.',
+                        style: TextStyle(
+                          color: Color(0xFFE2E8F0),
+                          fontSize: 15,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Card(
+                  elevation: 0,
+                  color: Colors.white.withOpacity(0.95),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Prediction Inputs',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Use the exact categories shown in the hints. The app validates numeric ranges before sending the request.',
+                          style: TextStyle(color: Color(0xFF475569), height: 1.4),
+                        ),
+                        const SizedBox(height: 20),
+                        _buildField(
+                          label: 'Region',
+                          hint: 'North',
+                          keyboardType: TextInputType.text,
+                          helperText: 'Allowed: East, North, South, West',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildField(
+                          label: 'Soil_Type',
+                          hint: 'Loam',
+                          keyboardType: TextInputType.text,
+                          helperText: 'Allowed: Chalky, Clay, Loam, Peaty, Sandy, Silt',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildField(
+                          label: 'Crop',
+                          hint: 'Maize',
+                          keyboardType: TextInputType.text,
+                          helperText: 'Allowed: Barley, Cotton, Maize, Rice, Soybean, Wheat',
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildField(
+                                label: 'Rainfall_mm',
+                                hint: '750',
+                                keyboardType: TextInputType.number,
+                                helperText: '100 to 1000 mm',
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildField(
+                                label: 'Temperature_Celsius',
+                                hint: '27',
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                helperText: '15 to 40 °C',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildField(
+                                label: 'Fertilizer_Used',
+                                hint: 'true',
+                                keyboardType: TextInputType.text,
+                                helperText: 'true / false',
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildField(
+                                label: 'Irrigation_Used',
+                                hint: 'true',
+                                keyboardType: TextInputType.text,
+                                helperText: 'true / false',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _buildField(
+                          label: 'Weather_Condition',
+                          hint: 'Sunny',
+                          keyboardType: TextInputType.text,
+                          helperText: 'Allowed: Cloudy, Rainy, Sunny',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildField(
+                          label: 'Days_to_Harvest',
+                          hint: '110',
+                          keyboardType: TextInputType.number,
+                          helperText: '60 to 149 days',
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: FilledButton.icon(
+                            onPressed: _isLoading ? null : _predictYield,
+                            icon: _isLoading
+                                ? const SizedBox(
+                                    height: 18,
+                                    width: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Icon(Icons.insights),
+                            label: Text(_isLoading ? 'Predicting...' : 'Predict'),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Text(
+                            _statusText,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              color: Color(0xFF0F172A),
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Card(
+                  elevation: 0,
+                  color: const Color(0xFF0F172A),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  child: const Padding(
+                    padding: EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'API Endpoint',
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'POST /predict',
+                          style: TextStyle(color: Color(0xFF7DD3FC), fontWeight: FontWeight.w600),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Set API_BASE_URL to your Render URL when deploying. Example: https://your-app.onrender.com',
+                          style: TextStyle(color: Color(0xFFCBD5E1), height: 1.4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
