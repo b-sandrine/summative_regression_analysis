@@ -76,15 +76,15 @@ class _CropYieldHomePageState extends State<CropYieldHomePage> {
   };
 
   final Map<String, TextEditingController> _controllers = {
-    'Region': TextEditingController(text: 'North'),
-    'Soil_Type': TextEditingController(text: 'Loam'),
-    'Crop': TextEditingController(text: 'Maize'),
-    'Rainfall_mm': TextEditingController(text: '750'),
-    'Temperature_Celsius': TextEditingController(text: '27'),
-    'Fertilizer_Used': TextEditingController(text: 'true'),
-    'Irrigation_Used': TextEditingController(text: 'true'),
-    'Weather_Condition': TextEditingController(text: 'Sunny'),
-    'Days_to_Harvest': TextEditingController(text: '110'),
+    'Region': TextEditingController(),
+    'Soil_Type': TextEditingController(),
+    'Crop': TextEditingController(),
+    'Rainfall_mm': TextEditingController(),
+    'Temperature_Celsius': TextEditingController(),
+    'Fertilizer_Used': TextEditingController(),
+    'Irrigation_Used': TextEditingController(),
+    'Weather_Condition': TextEditingController(),
+    'Days_to_Harvest': TextEditingController(),
   };
 
   String _statusText = 'Fill the fields, then tap Predict to call the API.';
