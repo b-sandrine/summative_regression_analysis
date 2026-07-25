@@ -276,12 +276,18 @@ class _CropYieldHomePageState extends State<CropYieldHomePage> {
         labelText: label.replaceAll('_', ' '),
         hintText: hint,
         helperText: helperText,
+        helperStyle: const TextStyle(color: Color(0xFF64748B)),
         filled: true,
         fillColor: const Color(0xFFF8FAFC),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFF0F766E), width: 1.6),
         ),
       ),
     );
@@ -297,12 +303,18 @@ class _CropYieldHomePageState extends State<CropYieldHomePage> {
       decoration: InputDecoration(
         labelText: label.replaceAll('_', ' '),
         helperText: helperText,
+        helperStyle: const TextStyle(color: Color(0xFF64748B)),
         filled: true,
         fillColor: const Color(0xFFF8FAFC),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFF0F766E), width: 1.6),
         ),
       ),
       items: options
@@ -329,50 +341,63 @@ class _CropYieldHomePageState extends State<CropYieldHomePage> {
   }) {
     final selectedValue = _parseBool(_controllers[label]!.text);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label.replaceAll('_', ' '),
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: RadioListTile<bool>(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('True'),
-                value: true,
-                groupValue: selectedValue,
-                onChanged: (value) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.replaceAll('_', ' '),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              ChoiceChip(
+                label: const Text('Yes'),
+                selected: selectedValue == true,
+                selectedColor: const Color(0xFFCCFBF1),
+                labelStyle: TextStyle(
+                  color: selectedValue == true ? const Color(0xFF0F766E) : const Color(0xFF334155),
+                  fontWeight: FontWeight.w600,
+                ),
+                onSelected: (_) {
                   setState(() {
-                    _controllers[label]!.text = value == true ? 'true' : 'false';
+                    _controllers[label]!.text = 'true';
                   });
                 },
               ),
-            ),
-            Expanded(
-              child: RadioListTile<bool>(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('False'),
-                value: false,
-                groupValue: selectedValue,
-                onChanged: (value) {
+              ChoiceChip(
+                label: const Text('No'),
+                selected: selectedValue == false,
+                selectedColor: const Color(0xFFCCFBF1),
+                labelStyle: TextStyle(
+                  color: selectedValue == false ? const Color(0xFF0F766E) : const Color(0xFF334155),
+                  fontWeight: FontWeight.w600,
+                ),
+                onSelected: (_) {
                   setState(() {
-                    _controllers[label]!.text = value == true ? 'true' : 'false';
+                    _controllers[label]!.text = 'false';
                   });
                 },
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          helperText,
-          style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
-        ),
-      ],
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            helperText,
+            style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+          ),
+        ],
+      ),
     );
   }
 
@@ -411,24 +436,40 @@ class _CropYieldHomePageState extends State<CropYieldHomePage> {
                       ),
                     ],
                   ),
-                  child: const Column(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Crop Yield Predictor',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(16),
                         ),
+                        child: const Icon(Icons.agriculture_rounded, color: Colors.white, size: 28),
                       ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Send crop, soil, weather, and farm inputs to the FastAPI model and receive a yield estimate.',
-                        style: TextStyle(
-                          color: Color(0xFFE2E8F0),
-                          fontSize: 15,
-                          height: 1.4,
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Crop Yield Predictor',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Send crop, soil, weather, and farm inputs to the FastAPI model and receive a yield estimate.',
+                              style: TextStyle(
+                                color: Color(0xFFE2E8F0),
+                                fontSize: 15,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -444,9 +485,15 @@ class _CropYieldHomePageState extends State<CropYieldHomePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Prediction Inputs',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                        Row(
+                          children: [
+                            const Icon(Icons.tune_rounded, color: Color(0xFF0F766E)),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Prediction Inputs',
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 8),
                         const Text(
@@ -523,9 +570,15 @@ class _CropYieldHomePageState extends State<CropYieldHomePage> {
                         const SizedBox(height: 20),
                         SizedBox(
                           width: double.infinity,
-                          height: 52,
+                          height: 54,
                           child: FilledButton.icon(
                             onPressed: _isLoading ? null : _predictYield,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF0F766E),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              elevation: 0,
+                            ),
                             icon: _isLoading
                                 ? const SizedBox(
                                     height: 18,
@@ -533,7 +586,7 @@ class _CropYieldHomePageState extends State<CropYieldHomePage> {
                                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                   )
                                 : const Icon(Icons.insights),
-                            label: Text(_isLoading ? 'Predicting...' : 'Predict'),
+                            label: Text(_isLoading ? 'Predicting...' : 'Predict Yield'),
                           ),
                         ),
                         const SizedBox(height: 18),
@@ -545,42 +598,30 @@ class _CropYieldHomePageState extends State<CropYieldHomePage> {
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(color: const Color(0xFFE2E8F0)),
                           ),
-                          child: Text(
-                            _statusText,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              color: Color(0xFF0F172A),
-                              height: 1.5,
-                            ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFCCFBF1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(Icons.auto_graph_rounded, color: Color(0xFF0F766E)),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _statusText,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    color: Color(0xFF0F172A),
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Card(
-                  elevation: 0,
-                  color: const Color(0xFF0F172A),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                  child: const Padding(
-                    padding: EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'API Endpoint',
-                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'POST /predict',
-                          style: TextStyle(color: Color(0xFF7DD3FC), fontWeight: FontWeight.w600),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Set API_BASE_URL to your Render URL when deploying. Example: https://your-app.onrender.com',
-                          style: TextStyle(color: Color(0xFFCBD5E1), height: 1.4),
                         ),
                       ],
                     ),
