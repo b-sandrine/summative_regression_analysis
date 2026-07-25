@@ -287,6 +287,95 @@ class _CropYieldHomePageState extends State<CropYieldHomePage> {
     );
   }
 
+  Widget _buildDropdownField({
+    required String label,
+    required List<String> options,
+    required String helperText,
+  }) {
+    return DropdownButtonFormField<String>(
+      value: _controllers[label]!.text.isEmpty ? null : _controllers[label]!.text,
+      decoration: InputDecoration(
+        labelText: label.replaceAll('_', ' '),
+        helperText: helperText,
+        filled: true,
+        fillColor: const Color(0xFFF8FAFC),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+      ),
+      items: options
+          .map(
+            (option) => DropdownMenuItem<String>(
+              value: option,
+              child: Text(option),
+            ),
+          )
+          .toList(),
+      onChanged: (value) {
+        if (value != null) {
+          setState(() {
+            _controllers[label]!.text = value;
+          });
+        }
+      },
+    );
+  }
+
+  Widget _buildBooleanField({
+    required String label,
+    required String helperText,
+  }) {
+    final selectedValue = _parseBool(_controllers[label]!.text);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.replaceAll('_', ' '),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: RadioListTile<bool>(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('True'),
+                value: true,
+                groupValue: selectedValue,
+                onChanged: (value) {
+                  setState(() {
+                    _controllers[label]!.text = value == true ? 'true' : 'false';
+                  });
+                },
+              ),
+            ),
+            Expanded(
+              child: RadioListTile<bool>(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('False'),
+                value: false,
+                groupValue: selectedValue,
+                onChanged: (value) {
+                  setState(() {
+                    _controllers[label]!.text = value == true ? 'true' : 'false';
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          helperText,
+          style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -365,24 +454,21 @@ class _CropYieldHomePageState extends State<CropYieldHomePage> {
                           style: TextStyle(color: Color(0xFF475569), height: 1.4),
                         ),
                         const SizedBox(height: 20),
-                        _buildField(
+                        _buildDropdownField(
                           label: 'Region',
-                          hint: 'North',
-                          keyboardType: TextInputType.text,
+                          options: _categoryOptions['Region']!,
                           helperText: 'Allowed: East, North, South, West',
                         ),
                         const SizedBox(height: 16),
-                        _buildField(
+                        _buildDropdownField(
                           label: 'Soil_Type',
-                          hint: 'Loam',
-                          keyboardType: TextInputType.text,
+                          options: _categoryOptions['Soil_Type']!,
                           helperText: 'Allowed: Chalky, Clay, Loam, Peaty, Sandy, Silt',
                         ),
                         const SizedBox(height: 16),
-                        _buildField(
+                        _buildDropdownField(
                           label: 'Crop',
-                          hint: 'Maize',
-                          keyboardType: TextInputType.text,
+                          options: _categoryOptions['Crop']!,
                           helperText: 'Allowed: Barley, Cotton, Maize, Rice, Soybean, Wheat',
                         ),
                         const SizedBox(height: 16),
@@ -408,32 +494,23 @@ class _CropYieldHomePageState extends State<CropYieldHomePage> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        Row(
+                        Column(
                           children: [
-                            Expanded(
-                              child: _buildField(
-                                label: 'Fertilizer_Used',
-                                hint: 'true',
-                                keyboardType: TextInputType.text,
-                                helperText: 'true / false',
-                              ),
+                            _buildBooleanField(
+                              label: 'Fertilizer_Used',
+                              helperText: 'Choose true or false',
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildField(
-                                label: 'Irrigation_Used',
-                                hint: 'true',
-                                keyboardType: TextInputType.text,
-                                helperText: 'true / false',
-                              ),
+                            const SizedBox(height: 12),
+                            _buildBooleanField(
+                              label: 'Irrigation_Used',
+                              helperText: 'Choose true or false',
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
-                        _buildField(
+                        _buildDropdownField(
                           label: 'Weather_Condition',
-                          hint: 'Sunny',
-                          keyboardType: TextInputType.text,
+                          options: _categoryOptions['Weather_Condition']!,
                           helperText: 'Allowed: Cloudy, Rainy, Sunny',
                         ),
                         const SizedBox(height: 16),
