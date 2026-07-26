@@ -17,14 +17,14 @@ class ApiConfig {
     }
 
     if (kIsWeb) {
-      return 'http://localhost:8000';
+      return 'https://summative-regression-analysis-h6uq.onrender.com';
     }
 
     if (Platform.isAndroid) {
-      return 'http://10.0.2.2:8000';
+      return 'https://summative-regression-analysis-h6uq.onrender.com';
     }
 
-    return 'http://127.0.0.1:8000';
+    return 'https://summative-regression-analysis-h6uq.onrender.com';
   }
 
   static Uri predictUri() {
