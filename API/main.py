@@ -71,7 +71,6 @@ class PredictionResponse(BaseModel):
     note: str = Field(..., description="Helpful note about the prediction output.")
 
 
-
 class RetrainResponse(BaseModel):
     status: str = Field(..., description="Status of the retraining operation.")
     model_name: str = Field(..., description="Name of the best model after retraining.")
